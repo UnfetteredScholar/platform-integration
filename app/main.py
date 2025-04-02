@@ -22,7 +22,7 @@ AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 REDIRECT_URI = os.getenv("AZURE_REDIRECT_URI")
 SCOPE = [
     "https://management.azure.com/user_impersonation",
-    "User.Read",
+    # "User.Read",
 ]  # ["User.Read"]
 
 # MSAL Client
@@ -79,7 +79,9 @@ def get_user_profile():
         return {"error": "User not authenticated"}
 
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get("https://graph.microsoft.com/v1.0/me", headers=headers)
+    response = requests.get(
+        "https://graph.microsoft.com/v1.0/me", headers=headers
+    )
 
     return response.json()
 
@@ -131,7 +133,9 @@ def upload_flow(environment_id: str = Body(embed=True)):
         responses.append(
             {
                 "flowID": api_result.get("name"),
-                "flowName": api_result.get("properties", {}).get("displayName"),
+                "flowName": api_result.get("properties", {}).get(
+                    "displayName"
+                ),
             }
         )
         # responses.append(api_result)
