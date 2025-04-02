@@ -1,0 +1,14 @@
+[project]
+name = "power-automate-upload"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-identity>=1.21.0",
+    "fastapi[standard]>=0.115.12",
+    "identity>=0.9.2",
+    "msal>=1.32.0",
+    "pydantic-settings>=2.8.1",
+    "python-dotenv>=1.1.0",
+]
