@@ -1,5 +1,4 @@
 import logging
-import logging.config
 import os
 from logging.handlers import TimedRotatingFileHandler
 
@@ -56,7 +55,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     # MONGODB_URI: str
     # DATABSE_NAME: str = "power-automate-upload"
-    # ALLOWED_ORIGINS: str = "*"
+    ALLOWED_ORIGINS: str = "*"
     # SECRET_KEY: str
     # ALGORITHM: str
     # ACCESS_TOKEN_EXPIRE_DAYS: int
@@ -65,8 +64,9 @@ class Settings(BaseSettings):
     AZURE_CLIENT_SECRET: str
     AZURE_TENANT_ID: str
     AZURE_REDIRECT_URI: str
-    AZURE_SCOPE: str
+    AZURE_SCOPE: list[str] = ["https://management.azure.com/user_impersonation"]
 
 
 settings = Settings()
+session_store = {}
 configure_logging()
