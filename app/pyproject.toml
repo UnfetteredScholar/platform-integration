@@ -10,5 +10,6 @@ dependencies = [
     "identity>=0.9.2",
     "msal>=1.32.0",
     "pydantic-settings>=2.8.1",
+    "pymongo>=4.11.3",
     "python-dotenv>=1.1.0",
 ]
