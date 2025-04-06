@@ -2,10 +2,13 @@ from logging import getLogger
 from typing import Any, Dict
 
 import requests
-from core.config import session_store
+from core.authentication.auth_middleware import get_current_token
+from core.config import session_store, settings
 from core.get_flow_url import update_flow_properties
 from core.marketplace import quest_flows
-from fastapi import APIRouter, Body, HTTPException, status
+from core.microsoft_auth_client import get_account, msal_client
+from fastapi import APIRouter, Body, Depends, HTTPException, status
+from schemas.token import TokenData
 
 # FastAPI router
 router = APIRouter(prefix="/power_automate")
@@ -14,62 +17,53 @@ BASE_URL = "https://api.flow.microsoft.com"
 
 
 @router.get("/get_environments")
-def get_environments():
+def get_environments(
+    token_data: TokenData = Depends(get_current_token),
+):
     """Fetch available Power Automate environments."""
-    token = session_store.get("token", {}).get("access_token")
-    # if "error" in token:
-    #     return redirect(url_for("login"))
+    logger = getLogger(__name__ + ".get_environments")
+    try:
+        oid = session_store[token_data.id]
+        token = msal_client.acquire_token_silent(
+            scopes=settings.AZURE_SCOPE, account=get_account(oid)
+        ).get("access_token")
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Microsoft Auth not completed",
+            )
 
-    URL = f"{BASE_URL}/providers/Microsoft.ProcessSimple/environments?api-version=2016-11-01"
+        URL = f"{BASE_URL}/providers/Microsoft.ProcessSimple/environments?api-version=2016-11-01"
 
-    api_result = requests.get(
-        URL,
-        headers={"Authorization": "Bearer " + token},
-        timeout=30,
-    ).json()
-    return api_result
-
-
-# @router.post("/upload_flow")
-# def upload_flow(environment_id: str = Body(embed=True)):
-#     """Upload a Power Automate flow from a zip file."""
-#     token = session_store.get("token", {}).get("access_token")
-#     # if "error" in token:
-#     #     return redirect(url_for("login"))
-
-#     # Get environment ID from request
-
-#     URL = f"{BASE_URL}/providers/Microsoft.ProcessSimple/environments/{environment_id}/flows?api-version=2016-11-01"
-#     responses = []
-#     for item in quest_flows:
-
-#         api_result = requests.post(
-#             URL,
-#             headers={
-#                 "Authorization": f"Bearer {token}",
-#                 "Content-Type": "routerlication/json",
-#             },
-#             json=item,
-#             timeout=30,
-#         ).json()
-
-#         responses.append(
-#             {
-#                 "flowID": api_result.get("name"),
-#                 "flowName": api_result.get("properties", {}).get("displayName"),
-#             }
-#         )
-#         # responses.append(api_result)
-#     return responses
+        api_result = requests.get(
+            URL,
+            headers={"Authorization": "Bearer " + token},
+            timeout=30,
+        ).json()
+        return api_result
+    except HTTPException as ex:
+        logger.exception(ex)
+        raise ex
+    except Exception as ex:
+        logger.exception(ex)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to get environments",
+        )
 
 
-# Ready to go
 @router.post("/upload_flow")
-def upload_flow(environment_id: str = Body(embed=True)):
+def upload_flow(
+    environment_id: str = Body(embed=True),
+    token_data: TokenData = Depends(get_current_token),
+):
     """Upload a Power Automate flow from a zip file."""
     logger = getLogger(__name__ + ".upload_flow")
     try:
-        token = session_store.get("token", {}).get("access_token")
+        oid = session_store[token_data.id]
+        token = msal_client.acquire_token_silent(
+            scopes=settings.AZURE_SCOPE, account=get_account(oid)
+        ).get("access_token")
         if not token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -95,7 +89,9 @@ def upload_flow(environment_id: str = Body(embed=True)):
         # If the filtered_flows is empty, the flow with 'Quest Auth' display name doesn't exist
         if filtered_flows:
             logger.info(filtered_flows)
-            flow_properties = filtered_flows[0]["properties"]["connectionReferences"]
+            flow_properties = filtered_flows[0]["properties"][
+                "connectionReferences"
+            ]
         else:
             logger.info(
                 "Quest AI Connections flow not found. Import flow and try again."
@@ -104,9 +100,9 @@ def upload_flow(environment_id: str = Body(embed=True)):
         ########################################################
         # Get the connections name from the filtered_flows
 
-        Microsoft_Teams_connection = flow_properties.get("shared_teams", None).get(
-            "connectionName", None
-        )
+        Microsoft_Teams_connection = flow_properties.get(
+            "shared_teams", None
+        ).get("connectionName", None)
         SharePoint_connection = flow_properties.get(
             "shared_sharepointonline", None
         ).get("connectionName", None)
@@ -121,21 +117,32 @@ def upload_flow(environment_id: str = Body(embed=True)):
         ).get("connectionName", None)
 
         # Print the connection names to verify
-        logger.info(f"Microsoft Teams Connection Name: {Microsoft_Teams_connection}")
+        logger.info(
+            f"Microsoft Teams Connection Name: {Microsoft_Teams_connection}"
+        )
         logger.info(f"SharePoint Connection Name: {SharePoint_connection}")
         logger.info(
             f"Office 365 Outlook Connection Name: {Office_365_Outlook_connection}"
         )
-        logger.info(f"Office 365 Users Connection Name: {Office_365_Users_connection}")
-        logger.info(f"Flow Management Connection Name: {Flow_Management_connection}")
+        logger.info(
+            f"Office 365 Users Connection Name: {Office_365_Users_connection}"
+        )
+        logger.info(
+            f"Flow Management Connection Name: {Flow_Management_connection}"
+        )
         ########################################################
         # Replace the connections name in the quest_flows
 
-        def update_connection_if_exists(flow, connection_key, new_connection_name):
+        def update_connection_if_exists(
+            flow, connection_key, new_connection_name
+        ):
             logger = getLogger(__name__ + ".update_connection_if_exists")
             try:
                 # Check if the connection exists in the flow
-                if connection_key in flow["properties"]["connectionReferences"]:
+                if (
+                    connection_key
+                    in flow["properties"]["connectionReferences"]
+                ):
                     # Update the connection name
                     flow["properties"]["connectionReferences"][connection_key][
                         "connectionName"
@@ -188,7 +195,9 @@ def upload_flow(environment_id: str = Body(embed=True)):
             primary_flows_responses.append(
                 {
                     "flowID": api_result.get("name"),
-                    "flowName": api_result.get("properties", {}).get("displayName"),
+                    "flowName": api_result.get("properties", {}).get(
+                        "displayName"
+                    ),
                 }
             )
 
@@ -198,10 +207,14 @@ def upload_flow(environment_id: str = Body(embed=True)):
         for response in primary_flows_responses:
             flow_id = response.get("flowID")
             # First update environment and flow IDs
-            updated_flow_object = update_flow_properties(environment_id, flow_id)
+            updated_flow_object = update_flow_properties(
+                environment_id, flow_id
+            )
             logger.info(updated_flow_object)
             update_connection_if_exists(
-                updated_flow_object, "shared_office365", Office_365_Outlook_connection
+                updated_flow_object,
+                "shared_office365",
+                Office_365_Outlook_connection,
             )
             update_connection_if_exists(
                 updated_flow_object,
@@ -209,13 +222,17 @@ def upload_flow(environment_id: str = Body(embed=True)):
                 Office_365_Users_connection,
             )
             update_connection_if_exists(
-                updated_flow_object, "shared_sharepointonline", SharePoint_connection
+                updated_flow_object,
+                "shared_sharepointonline",
+                SharePoint_connection,
             )
             update_connection_if_exists(
                 updated_flow_object, "shared_teams", Microsoft_Teams_connection
             )
             update_connection_if_exists(
-                updated_flow_object, "shared_flowmanagement", Flow_Management_connection
+                updated_flow_object,
+                "shared_flowmanagement",
+                Flow_Management_connection,
             )
 
             URL = f"{BASE_URL}/providers/Microsoft.ProcessSimple/environments/{environment_id}/flows?api-version=2016-11-01"
@@ -233,7 +250,9 @@ def upload_flow(environment_id: str = Body(embed=True)):
             url_collection_responses.append(
                 {
                     "flowID": api_result.get("name"),
-                    "flowName": api_result.get("properties", {}).get("displayName"),
+                    "flowName": api_result.get("properties", {}).get(
+                        "displayName"
+                    ),
                 }
             )
         message = {
@@ -241,6 +260,12 @@ def upload_flow(environment_id: str = Body(embed=True)):
             "url_collection_responses": url_collection_responses,
         }
         return message
-    except Exception as ex:
+    except HTTPException as ex:
         logger.exception(ex)
         raise ex
+    except Exception as ex:
+        logger.exception(ex)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to upload flows",
+        )

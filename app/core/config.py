@@ -56,15 +56,17 @@ class Settings(BaseSettings):
     # MONGODB_URI: str
     # DATABSE_NAME: str = "power-automate-upload"
     ALLOWED_ORIGINS: str = "*"
-    # SECRET_KEY: str
-    # ALGORITHM: str
-    # ACCESS_TOKEN_EXPIRE_DAYS: int
+    QUEST_AI_SECRET_KEY: str
+    ALGORITHM: str
+    ACCESS_TOKEN_EXPIRE_DAYS: int
 
     AZURE_CLIENT_ID: str
     AZURE_CLIENT_SECRET: str
     AZURE_TENANT_ID: str
     AZURE_REDIRECT_URI: str
-    AZURE_SCOPE: list[str] = ["https://management.azure.com/user_impersonation"]
+    AZURE_SCOPE: list[str] = [
+        "https://management.azure.com/user_impersonation"
+    ]
 
 
 settings = Settings()
