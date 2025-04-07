@@ -12,7 +12,7 @@ def configure_logging():
     os.makedirs("./logs", exist_ok=True)
     # Create a TimedRotatingFileHandler
     handler = TimedRotatingFileHandler(
-        "./logs/power-automate-upload-api.log",  # Log file path
+        "./logs/platform-integration-api.log",  # Log file path
         when="midnight",  # Rotate at midnight
         interval=1,  # Every 1 day
         backupCount=7,  # Keep last 7 days of logs
@@ -38,7 +38,7 @@ def configure_logging():
 
     # detailed logs
     detailed_handler = TimedRotatingFileHandler(
-        "./logs/detailed.power-automate-upload-api.log",  # Log file path
+        "./logs/detailed.platform-integration-api.log",  # Log file path
         when="midnight",  # Rotate at midnight
         interval=1,  # Every 1 day
         backupCount=7,  # Keep last 7 days of logs
@@ -49,12 +49,12 @@ def configure_logging():
 
 
 class Settings(BaseSettings):
-    APP_TITLE: str = "Power Automate Upload"
+    APP_TITLE: str = "Automation Platform Integration"
     VERSION: str = "1.0"
     RELEASE_ID: str = "0.1"
     API_V1_STR: str = "/api/v1"
-    # MONGODB_URI: str
-    # DATABSE_NAME: str = "power-automate-upload"
+    MONGODB_URI: str
+    DATABSE_NAME: str = "agents-platform-integration"
     ALLOWED_ORIGINS: str = "*"
     QUEST_AI_SECRET_KEY: str
     ALGORITHM: str
@@ -70,5 +70,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-session_store = {}
 configure_logging()

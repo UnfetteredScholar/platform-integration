@@ -2,12 +2,14 @@ from logging import getLogger
 from typing import Any, Dict
 
 import requests
+from core import storage
 from core.authentication.auth_middleware import get_current_token
-from core.config import session_store, settings
+from core.config import settings
 from core.get_flow_url import update_flow_properties
 from core.marketplace import quest_flows
-from core.microsoft_auth_client import get_account, msal_client
+from core.microsoft_auth_client import get_msal_client
 from fastapi import APIRouter, Body, Depends, HTTPException, status
+from msal import ConfidentialClientApplication
 from schemas.token import TokenData
 
 # FastAPI router
@@ -19,19 +21,29 @@ BASE_URL = "https://api.flow.microsoft.com"
 @router.get("/get_environments")
 def get_environments(
     token_data: TokenData = Depends(get_current_token),
+    msal_client: ConfidentialClientApplication = Depends(get_msal_client),
 ):
     """Fetch available Power Automate environments."""
     logger = getLogger(__name__ + ".get_environments")
     try:
-        oid = session_store[token_data.id]
-        token = msal_client.acquire_token_silent(
-            scopes=settings.AZURE_SCOPE, account=get_account(oid)
-        ).get("access_token")
-        if not token:
+        # conn_data = storage.platform_connections.get(
+        #     {"user_id": token_data.id}
+        # )
+        # oid = conn_data.microsoft_oid
+
+        if len(msal_client.get_accounts()) == 0:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Microsoft Auth not completed",
+                status_code=400, detail="Outlook not connected"
             )
+
+        token = msal_client.acquire_token_silent(
+            scopes=settings.AZURE_SCOPE, account=msal_client.get_accounts()[0]
+        ).get("access_token")
+        # if not token:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="Microsoft Auth not completed",
+        #     )
 
         URL = f"{BASE_URL}/providers/Microsoft.ProcessSimple/environments?api-version=2016-11-01"
 
@@ -56,19 +68,27 @@ def get_environments(
 def upload_flow(
     environment_id: str = Body(embed=True),
     token_data: TokenData = Depends(get_current_token),
+    msal_client: ConfidentialClientApplication = Depends(get_msal_client),
 ):
     """Upload a Power Automate flow from a zip file."""
     logger = getLogger(__name__ + ".upload_flow")
     try:
-        oid = session_store[token_data.id]
-        token = msal_client.acquire_token_silent(
-            scopes=settings.AZURE_SCOPE, account=get_account(oid)
-        ).get("access_token")
-        if not token:
+        # conn_data = storage.platform_connections.get(
+        #     {"user_id": token_data.id}
+        # )
+        # oid = conn_data.microsoft_oid
+        if len(msal_client.get_accounts()) == 0:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Microsoft Auth not completed",
+                status_code=400, detail="Outlook not connected"
             )
+        token = msal_client.acquire_token_silent(
+            scopes=settings.AZURE_SCOPE, account=msal_client.get_accounts()[0]
+        ).get("access_token")
+        # if not token:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="Microsoft Auth not completed",
+        #     )
 
         # Get connections flow
         URL = f"{BASE_URL}/providers/Microsoft.ProcessSimple/environments/{environment_id}/flows?api-version=2016-11-01"

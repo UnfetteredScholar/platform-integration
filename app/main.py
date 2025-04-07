@@ -1,4 +1,9 @@
-from api.v1.routers import auth, health, power_automate
+from api.v1.routers import (
+    auth,
+    health,
+    power_automate,
+    power_automate_user_flows,
+)
 from bson.errors import InvalidId
 from core.config import settings
 from fastapi import FastAPI, status
@@ -16,10 +21,19 @@ app.add_middleware(
     allow_methods=["*"],
 )
 
-app.include_router(router=health.router, prefix=settings.API_V1_STR, tags=["health"])
+app.include_router(
+    router=health.router, prefix=settings.API_V1_STR, tags=["health"]
+)
 app.include_router(router=auth.router, tags=["microsoft auth"])
 app.include_router(
-    router=power_automate.router, prefix=settings.API_V1_STR, tags=["power_automate"]
+    router=power_automate.router,
+    prefix=settings.API_V1_STR,
+    tags=["power automate user flows"],
+)
+app.include_router(
+    router=power_automate_user_flows.router,
+    prefix=settings.API_V1_STR,
+    tags=["power_automate"],
 )
 
 
