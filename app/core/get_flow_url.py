@@ -166,7 +166,7 @@ def update_flow_properties(environment_id, flow_name, auth_header: str):
             .get("actions", {})
             .get("Get_Flow", {})
             .get("inputs", {})
-            .get("headers")
+            .get("parameters")
         )
 
         if get_flow_params is None:
@@ -177,21 +177,21 @@ def update_flow_properties(environment_id, flow_name, auth_header: str):
         get_flow_params["environmentName"] = environment_id
         get_flow_params["flowName"] = flow_name
 
-        # Update HTTP parameters
-        http_params = (
+        # Update HTTP headers
+        http_headers = (
             properties_data.get("definition", {})
             .get("actions", {})
             .get("HTTP", {})
             .get("inputs", {})
-            .get("parameters")
+            .get("headers")
         )
 
-        if http_params is None:
+        if http_headers is None:
             raise KeyError(
                 "Nested path to Get_Flow parameters not found or incomplete"
             )
 
-        http_params["Authorization"] = auth_header
+        http_headers["Authorization"] = auth_header
 
     except KeyError as e:
         logger.error(f"Error: Missing key in template structure - {e}")
