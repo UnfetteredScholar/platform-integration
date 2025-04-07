@@ -41,6 +41,7 @@ def delete_flow(flow_id: str, environment_id: str, auth_token: str):
 def delete_flows(
     flows: List[Dict[str, str]], environment_id: str, auth_token: str
 ) -> None:
+    logger = getLogger(__name__ + ".delete_flows")
     time.sleep(120)
     for flow in flows:
         try:
@@ -49,8 +50,9 @@ def delete_flows(
                 environment_id=environment_id,
                 auth_token=auth_token,
             )
-        except Exception:
-            pass
+            logger.info(f"Removed flow {flow['flowID']}")
+        except Exception as ex:
+            logger.exception(ex)
 
 
 @router.get("/get_environments")
