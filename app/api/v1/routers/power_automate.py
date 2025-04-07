@@ -1,5 +1,6 @@
+import time
 from logging import getLogger
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import requests
 from core import storage
@@ -8,7 +9,15 @@ from core.config import settings
 from core.get_flow_url import update_flow_properties
 from core.marketplace import quest_flows
 from core.microsoft_auth_client import get_msal_client
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Request,
+    status,
+)
 from msal import ConfidentialClientApplication
 from schemas.token import TokenData
 
@@ -16,6 +25,32 @@ from schemas.token import TokenData
 router = APIRouter(prefix="/power_automate")
 
 BASE_URL = "https://api.flow.microsoft.com"
+
+
+def delete_flow(flow_id: str, environment_id: str, auth_token: str):
+    """Turn off a Power Automate flow."""
+
+    URL = f"{BASE_URL}/providers/Microsoft.ProcessSimple/environments/{environment_id}/flows/{flow_id}?api-version=2016-11-01"
+    api_result = requests.delete(
+        URL,
+        headers={"Authorization": f"Bearer {auth_token}"},
+        timeout=30,
+    ).json()
+
+
+def delete_flows(
+    flows: List[Dict[str, str]], environment_id: str, auth_token: str
+) -> None:
+    time.sleep(120)
+    for flow in flows:
+        try:
+            delete_flow(
+                flow_id=flow["flowID"],
+                environment_id=environment_id,
+                auth_token=auth_token,
+            )
+        except Exception:
+            pass
 
 
 @router.get("/get_environments")
@@ -66,6 +101,8 @@ def get_environments(
 
 @router.post("/upload_flow")
 def upload_flow(
+    request: Request,
+    background_tasks: BackgroundTasks,
     environment_id: str = Body(embed=True),
     token_data: TokenData = Depends(get_current_token),
     msal_client: ConfidentialClientApplication = Depends(get_msal_client),
@@ -228,7 +265,7 @@ def upload_flow(
             flow_id = response.get("flowID")
             # First update environment and flow IDs
             updated_flow_object = update_flow_properties(
-                environment_id, flow_id
+                environment_id, flow_id, request.headers.get("Authorization")
             )
             logger.info(updated_flow_object)
             update_connection_if_exists(
@@ -275,6 +312,12 @@ def upload_flow(
                     ),
                 }
             )
+        background_tasks.add_task(
+            delete_flows,
+            flows=url_collection_responses,
+            environment_id=environment_id,
+            auth_token=token,
+        )
         message = {
             "primary_flows_responses": primary_flows_responses,
             "url_collection_responses": url_collection_responses,
