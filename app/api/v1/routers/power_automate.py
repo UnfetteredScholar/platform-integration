@@ -29,13 +29,16 @@ BASE_URL = "https://api.flow.microsoft.com"
 
 def delete_flow(flow_id: str, environment_id: str, auth_token: str):
     """Turn off a Power Automate flow."""
-
+    logger = getLogger(__name__ + ".delete_flow")
     URL = f"{BASE_URL}/providers/Microsoft.ProcessSimple/environments/{environment_id}/flows/{flow_id}?api-version=2016-11-01"
     api_result = requests.delete(
         URL,
         headers={"Authorization": f"Bearer {auth_token}"},
         timeout=30,
-    ).json()
+    )
+
+    if not api_result.ok:
+        logger.error(api_result.content)
 
 
 def delete_flows(
