@@ -44,7 +44,7 @@ async def add_user_flow(
         else:
             data = flow_data.model_dump()
             data["user_id"] = token_data.id
-            data["status"] = FlowStatus.ACTIVE
+            data["status"] = FlowStatus.INACTIVE
             storage.power_automate_user_flows.create(data=data)
 
         return storage.power_automate_user_flows.verify(
@@ -163,9 +163,7 @@ async def update_user_flow(
         )
 
 
-@router.delete(
-    "/power_automate/flows/{flow_id}", response_model=Dict[str, str]
-)
+@router.delete("/power_automate/flows/{flow_id}", response_model=Dict[str, str])
 async def delete_user_flow(
     flow_id: str = Path(description="Field ID or Object Id of Field record"),
     token_data: TokenData = Depends(get_current_token),
