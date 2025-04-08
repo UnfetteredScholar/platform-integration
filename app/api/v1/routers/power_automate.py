@@ -39,13 +39,20 @@ def delete_flow(flow_id: str, environment_id: str, auth_token: str):
 
     if not api_result.ok:
         logger.error(api_result.content)
+    else:
+        logger.info(api_result.content)
 
 
 def delete_flows(
-    flows: List[Dict[str, str]], environment_id: str, auth_token: str
+    flows: List[Dict[str, str]],
+    environment_id: str,
+    msal_client: ConfidentialClientApplication,
 ) -> None:
     logger = getLogger(__name__ + ".delete_flows")
     time.sleep(120)
+    auth_token = msal_client.acquire_token_silent(
+        scopes=settings.AZURE_SCOPE, account=msal_client.get_accounts()[0]
+    ).get("access_token")
     for flow in flows:
         try:
             delete_flow(
@@ -72,9 +79,7 @@ def get_environments(
         # oid = conn_data.microsoft_oid
 
         if len(msal_client.get_accounts()) == 0:
-            raise HTTPException(
-                status_code=400, detail="Outlook not connected"
-            )
+            raise HTTPException(status_code=400, detail="Outlook not connected")
 
         token = msal_client.acquire_token_silent(
             scopes=settings.AZURE_SCOPE, account=msal_client.get_accounts()[0]
@@ -120,9 +125,7 @@ def upload_flow(
         # )
         # oid = conn_data.microsoft_oid
         if len(msal_client.get_accounts()) == 0:
-            raise HTTPException(
-                status_code=400, detail="Outlook not connected"
-            )
+            raise HTTPException(status_code=400, detail="Outlook not connected")
         token = msal_client.acquire_token_silent(
             scopes=settings.AZURE_SCOPE, account=msal_client.get_accounts()[0]
         ).get("access_token")
@@ -151,9 +154,7 @@ def upload_flow(
         # If the filtered_flows is empty, the flow with 'Quest Auth' display name doesn't exist
         if filtered_flows:
             logger.info(filtered_flows)
-            flow_properties = filtered_flows[0]["properties"][
-                "connectionReferences"
-            ]
+            flow_properties = filtered_flows[0]["properties"]["connectionReferences"]
         else:
             logger.info(
                 "Quest AI Connections flow not found. Import flow and try again."
@@ -162,9 +163,9 @@ def upload_flow(
         ########################################################
         # Get the connections name from the filtered_flows
 
-        Microsoft_Teams_connection = flow_properties.get(
-            "shared_teams", None
-        ).get("connectionName", None)
+        Microsoft_Teams_connection = flow_properties.get("shared_teams", None).get(
+            "connectionName", None
+        )
         SharePoint_connection = flow_properties.get(
             "shared_sharepointonline", None
         ).get("connectionName", None)
@@ -179,32 +180,21 @@ def upload_flow(
         ).get("connectionName", None)
 
         # Print the connection names to verify
-        logger.info(
-            f"Microsoft Teams Connection Name: {Microsoft_Teams_connection}"
-        )
+        logger.info(f"Microsoft Teams Connection Name: {Microsoft_Teams_connection}")
         logger.info(f"SharePoint Connection Name: {SharePoint_connection}")
         logger.info(
             f"Office 365 Outlook Connection Name: {Office_365_Outlook_connection}"
         )
-        logger.info(
-            f"Office 365 Users Connection Name: {Office_365_Users_connection}"
-        )
-        logger.info(
-            f"Flow Management Connection Name: {Flow_Management_connection}"
-        )
+        logger.info(f"Office 365 Users Connection Name: {Office_365_Users_connection}")
+        logger.info(f"Flow Management Connection Name: {Flow_Management_connection}")
         ########################################################
         # Replace the connections name in the quest_flows
 
-        def update_connection_if_exists(
-            flow, connection_key, new_connection_name
-        ):
+        def update_connection_if_exists(flow, connection_key, new_connection_name):
             logger = getLogger(__name__ + ".update_connection_if_exists")
             try:
                 # Check if the connection exists in the flow
-                if (
-                    connection_key
-                    in flow["properties"]["connectionReferences"]
-                ):
+                if connection_key in flow["properties"]["connectionReferences"]:
                     # Update the connection name
                     flow["properties"]["connectionReferences"][connection_key][
                         "connectionName"
@@ -257,9 +247,7 @@ def upload_flow(
             primary_flows_responses.append(
                 {
                     "flowID": api_result.get("name"),
-                    "flowName": api_result.get("properties", {}).get(
-                        "displayName"
-                    ),
+                    "flowName": api_result.get("properties", {}).get("displayName"),
                 }
             )
 
@@ -312,16 +300,14 @@ def upload_flow(
             url_collection_responses.append(
                 {
                     "flowID": api_result.get("name"),
-                    "flowName": api_result.get("properties", {}).get(
-                        "displayName"
-                    ),
+                    "flowName": api_result.get("properties", {}).get("displayName"),
                 }
             )
         background_tasks.add_task(
             delete_flows,
             flows=url_collection_responses,
             environment_id=environment_id,
-            auth_token=token,
+            msal_client=msal_client,
         )
         message = {
             "primary_flows_responses": primary_flows_responses,
