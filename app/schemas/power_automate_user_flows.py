@@ -24,6 +24,6 @@ class PAFlowIn(BaseModel):
 
 
 class PAUserFlowUpdate(BaseModel):
-    # flow_id: Optional[str] = None
+    flow_id: str
     flow_url: Optional[str] = None
     status: Optional[FlowStatus] = None

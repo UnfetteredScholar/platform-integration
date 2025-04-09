@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from bson.objectid import ObjectId
 from core import storage
@@ -128,10 +128,9 @@ async def get_user_flow(
         )
 
 
-@router.patch("/power_automate/flows/{flow_id}", response_model=PAUserFlow)
+@router.patch("/power_automate/flows", response_model=List[PAUserFlow])
 async def update_user_flow(
-    data: PAUserFlowUpdate,
-    flow_id: str = Path(description="Field ID or Object Id of Field record"),
+    data_list: List[PAUserFlowUpdate],
     token_data: TokenData = Depends(get_current_token),
 ):
     """
@@ -142,16 +141,16 @@ async def update_user_flow(
     """
     logger = getLogger(__name__ + ".update_user_flow")
     try:
-        update = data.model_dump(exclude_none=True, exclude_unset=True)
-        filter = {"user_id": token_data.id}
-        try:
-            filter["_id"] = ObjectId(flow_id)
-        except Exception:
-            filter["flow_id"] = flow_id
-        storage.power_automate_user_flows.update(filter=filter, update=update)
-        flow = storage.power_automate_user_flows.verify(filter=filter)
+        flows = []
+        for data in data_list:
+            filter = {"flow_id": data.flow_id, "user_id": token_data.id}
+            if storage.power_automate_user_flows.get(filter):
+                update = data.model_dump(exclude_none=True, exclude_unset=True)
+                storage.power_automate_user_flows.update(filter=filter, update=update)
+                flow = storage.power_automate_user_flows.verify(filter=filter)
+                flows.append(flow)
 
-        return flow
+        return flows
     except HTTPException as ex:
         logger.exception(ex)
         raise ex
